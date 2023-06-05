@@ -36,7 +36,7 @@ body {
 }
 
 header {
-    background-color: rgba(0, 0, 0, 0.700);
+    background-color: rgb(0, 0, 0);
     position: fixed;
     display: flex;
     width: 100%;
@@ -311,7 +311,7 @@ footer {
     }
 
     header {
-        background-color: rgba(0, 0, 0, 0.700);
+        background-color: rgb(0, 0, 0);
         position: fixed;
         display: flex;
         width: 100%;
