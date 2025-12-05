@@ -1,6 +1,11 @@
-name: CI - Build Landingpage
+name: CI - Build
 on:
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      image_name:
+        description: 'Nome da imagem (sem o usuário/host). Ex: landingpage'
+        required: false
+        default: ''
   push:
     branches:
       - main
@@ -9,7 +14,7 @@ on:
       - 'v*'
       - '*'
 jobs:
-  build_landingpage:
+  build_image:
     name: Build and Push Docker image
     runs-on: ubuntu-latest
     env:
@@ -17,6 +22,8 @@ jobs:
       REGISTRY_PASS: ${{ secrets.REGISTRY_PASS }}
       # optional: set REGISTRY_HOST in repository secrets or variables (e.g. ghcr.io, docker.io)
       REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
+      # IMAGE_NAME priority: workflow input > repository var
+      IMAGE_NAME: ${{ github.event.inputs.image_name || vars.IMAGE_NAME }}
 
     steps:
       - name: Checkout repository
@@ -45,10 +52,10 @@ jobs:
 
           # prepare tags using shell variables (avoid GitHub expressions inside run)
           echo "TAGS<<EOF" >> $GITHUB_ENV
-          echo "${PREFIX}${REGISTRY_USER}/landingpage:${SHORT_SHA}" >> $GITHUB_ENV
-          echo "${PREFIX}${REGISTRY_USER}/landingpage:${REF_NAME}" >> $GITHUB_ENV
+          echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:${SHORT_SHA}" >> $GITHUB_ENV
+          echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:${REF_NAME}" >> $GITHUB_ENV
           if [[ "${REF_NAME}" == "main" ]]; then
-            echo "${PREFIX}${REGISTRY_USER}/landingpage:latest" >> $GITHUB_ENV
+            echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:latest" >> $GITHUB_ENV
           fi
           echo "EOF" >> $GITHUB_ENV
 
