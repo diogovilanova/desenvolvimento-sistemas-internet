@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       image_name:
-        description: 'Nome da imagem (sem o usuário/host). Ex: landingpage'
+        description: 'Nome da imagem (sem o usuário/host). Ex: appname'
         required: false
         default: ''
   push:
@@ -24,8 +24,8 @@ jobs:
       REGISTRY_PASS: ${{ secrets.REGISTRY_PASS }}
       # optional: set REGISTRY_HOST in repository secrets (e.g. ghcr.io). Leave empty for Docker Hub.
       REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
-      # IMAGE_NAME priority: workflow input > repository var > default 'landingpage'
-      IMAGE_NAME: ${{ github.event.inputs.image_name || vars.IMAGE_NAME || 'landingpage' }}
+      # IMAGE_NAME priority: workflow input > repository var
+      IMAGE_NAME: ${{ github.event.inputs.image_name || vars.IMAGE_NAME }}
 
     steps:
       - name: Checkout repository
