@@ -1,4 +1,5 @@
 name: CI - Build
+
 on:
   workflow_dispatch:
     inputs:
@@ -7,23 +8,24 @@ on:
         required: false
         default: ''
   push:
-    branches:
-      - main
-      - develop
+    # only tag pushes will actually run the job (job has an if-condition)
     tags:
       - 'v*'
       - '*'
+
 jobs:
   build_image:
     name: Build and Push Docker image
     runs-on: ubuntu-latest
+    # run only for manual dispatch or when ref is a tag
+    if: ${{ github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/') }}
     env:
       REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
       REGISTRY_PASS: ${{ secrets.REGISTRY_PASS }}
-      # optional: set REGISTRY_HOST in repository secrets or variables (e.g. ghcr.io, docker.io)
+      # optional: set REGISTRY_HOST in repository secrets (e.g. ghcr.io). Leave empty for Docker Hub.
       REGISTRY_HOST: ${{ secrets.REGISTRY_HOST }}
-      # IMAGE_NAME priority: workflow input > repository var
-      IMAGE_NAME: ${{ github.event.inputs.image_name || vars.IMAGE_NAME }}
+      # IMAGE_NAME priority: workflow input > repository var > default 'landingpage'
+      IMAGE_NAME: ${{ github.event.inputs.image_name || vars.IMAGE_NAME || 'landingpage' }}
 
     steps:
       - name: Checkout repository
@@ -32,12 +34,14 @@ jobs:
       - name: Set short SHA
         run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-8)" >> $GITHUB_ENV
 
-      - name: Prepare image tags from ref
+      - name: Prepare image tags from ref (tags only)
         run: |
+          # when run for tags, GITHUB_REF is refs/tags/<tag>
           if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
             REF_NAME="${GITHUB_REF#refs/tags/}"
           else
-            REF_NAME="${GITHUB_REF#refs/heads/}"
+            # for manual runs, mark as 'manual' (we still produce SHORT_SHA and DATE tag)
+            REF_NAME="manual"
           fi
           # sanitize: replace slashes with dashes
           REF_NAME="${REF_NAME//\//-}"
@@ -50,13 +54,16 @@ jobs:
             PREFIX=""
           fi
 
-          # prepare tags using shell variables (avoid GitHub expressions inside run)
+          # compute date tag (UTC YYYYMMDD)
+          DATE_TAG=$(date -u +%Y%m%d)
+
+          # prepare tags: short SHA, (tag name if present), and date
           echo "TAGS<<EOF" >> $GITHUB_ENV
           echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:${SHORT_SHA}" >> $GITHUB_ENV
-          echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:${REF_NAME}" >> $GITHUB_ENV
-          if [[ "${REF_NAME}" == "main" ]]; then
-            echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:latest" >> $GITHUB_ENV
+          if [[ "${REF_NAME}" != "manual" ]]; then
+            echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:${REF_NAME}" >> $GITHUB_ENV
           fi
+          echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:${DATE_TAG}" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
       - name: Set up QEMU
@@ -87,4 +94,3 @@ jobs:
           file: ./app/Dockerfile
           push: true
           tags: ${{ env.TAGS }}
-
