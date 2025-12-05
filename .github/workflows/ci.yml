@@ -57,12 +57,8 @@ jobs:
           # compute date tag (UTC YYYYMMDD)
           DATE_TAG=$(date -u +%Y%m%d)
 
-          # prepare tags: short SHA, (tag name if present), and date
+          # prepare single tag: date (UTC YYYYMMDD)
           echo "TAGS<<EOF" >> $GITHUB_ENV
-          echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:${SHORT_SHA}" >> $GITHUB_ENV
-          if [[ "${REF_NAME}" != "manual" ]]; then
-            echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:${REF_NAME}" >> $GITHUB_ENV
-          fi
           echo "${PREFIX}${REGISTRY_USER}/${IMAGE_NAME}:${DATE_TAG}" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
 
