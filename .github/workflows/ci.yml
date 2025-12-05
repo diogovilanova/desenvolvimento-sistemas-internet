@@ -1,43 +1,66 @@
 name: CI - Build Landingpage
-
 on:
-	workflow_dispatch: {}
-
+  workflow_dispatch: {}
+  push:
+    branches:
+      - main
+      - develop
+    tags:
+      - 'v*'
+      - '*'
 jobs:
-	build_landingpage:
-		name: Build and Push Docker image
-		runs-on: ubuntu-latest
-		env:
-			REGISTRY_USER: ${{ secrets.REGISTRY_USER }}
-			REGISTRY_PASS: ${{ secrets.REGISTRY_PASS }}
-			# optional: set REGISTRY_HOST in repository secrets (e.g. ghcr.io, docker.io)
-			REGISTRY_HOST: ${{ secrets.REGISTRY_HOST || 'docker.io' }}
+  build_landingpage:
+    name: Build and Push Docker image
+    runs-on: ubuntu-latest
+    env:
+      REGISTRY_USER: ${{ vars.REGISTRY_USER }}
+      REGISTRY_PASS: ${{ vars.REGISTRY_PASS }}
+      # optional: set REGISTRY_HOST in repository variables (e.g. ghcr.io, docker.io)
+      REGISTRY_HOST: ${{ vars.REGISTRY_HOST }}
 
-		steps:
-			- name: Checkout repository
-				uses: actions/checkout@v4
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-			- name: Set short SHA
-				run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-8)" >> $GITHUB_ENV
+      - name: Set short SHA
+        run: echo "SHORT_SHA=$(echo $GITHUB_SHA | cut -c1-8)" >> $GITHUB_ENV
 
-			- name: Set up QEMU
-				uses: docker/setup-qemu-action@v2
+      - name: Prepare image tags from ref
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            REF_NAME="${GITHUB_REF#refs/tags/}"
+          else
+            REF_NAME="${GITHUB_REF#refs/heads/}"
+          fi
+          # sanitize: replace slashes with dashes
+          REF_NAME="${REF_NAME//\//-}"
+          echo "REF_NAME=${REF_NAME}" >> $GITHUB_ENV
+          # prepare tags: short sha + ref name
+          TAGS="${{ env.REGISTRY_USER }}/landingpage:${SHORT_SHA}\n${{ env.REGISTRY_USER }}/landingpage:${REF_NAME}"
+          if [[ "${REF_NAME}" == "main" ]]; then
+            TAGS="${TAGS}\n${{ env.REGISTRY_USER }}/landingpage:latest"
+          fi
+          # export TAGS preserving newlines
+          echo -e "TAGS=${TAGS}" >> $GITHUB_ENV
 
-			- name: Set up Docker Buildx
-				uses: docker/setup-buildx-action@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
 
-			- name: Login to container registry
-				uses: docker/login-action@v2
-				with:
-					username: ${{ env.REGISTRY_USER }}
-					password: ${{ env.REGISTRY_PASS }}
-					registry: ${{ env.REGISTRY_HOST }}
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-			- name: Build and push image
-				uses: docker/build-push-action@v4
-				with:
-					context: ./app
-					file: ./app/Dockerfile
-					push: true
-					tags: ${{ env.REGISTRY_USER }}/landingpage:${{ env.SHORT_SHA }}
+      - name: Login to container registry
+        uses: docker/login-action@v2
+        with:
+          username: ${{ env.REGISTRY_USER }}
+          password: ${{ env.REGISTRY_PASS }}
+          registry: ${{ env.REGISTRY_HOST }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v4
+        with:
+          context: ./app
+          file: ./app/Dockerfile
+          push: true
+          tags: ${{ env.TAGS }}
 
